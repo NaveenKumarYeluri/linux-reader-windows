@@ -1,8 +1,10 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using LinuxReader.Core.Ext4;
 using LinuxReader.Core.IO;
 using LinuxReader.Core.Partitions;
@@ -13,6 +15,7 @@ namespace LinuxReader.Gui;
 public partial class MainWindow : Window
 {
     private Stream? _activeDiskStream;
+    private string? _activeDevicePath;
     private Ext4FileSystem? _activeFileSystem;
     private List<Ext4Item> _currentFolderItems = new();
     private Ext4Item? _selectedItem;
@@ -23,6 +26,7 @@ public partial class MainWindow : Window
         public string PathOrDevice { get; init; } = string.Empty;
         public PartitionInfo? Partition { get; init; }
         public bool IsImage { get; init; }
+        public bool IsAccessible { get; init; } = true;
     }
 
     public class DisplayFileItem
@@ -40,6 +44,205 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        UpdateAdminStatusUI();
+
+        if (DeviceManager.IsAdministrator())
+        {
+            // Administrator mode detected: automatically scan physical hard drives on startup
+            ScanPhysicalDrives(autoSelectFirstLinux: true);
+        }
+        else
+        {
+            TxtStatus.Text = "Running as Standard User. Raw physical drives require Administrator rights to inspect. Click 'Scan Hard Drives' to elevate or 'Open Disk Image'.";
+        }
+    }
+
+    private void UpdateAdminStatusUI()
+    {
+        bool isAdmin = DeviceManager.IsAdministrator();
+        if (isAdmin)
+        {
+            BadgeAdminStatus.Background = new SolidColorBrush(Color.FromRgb(6, 95, 70));
+            TxtAdminIcon.Text = "🛡️";
+            TxtAdminStatus.Text = "ADMINISTRATOR MODE";
+            TxtAdminStatus.Foreground = new SolidColorBrush(Color.FromRgb(52, 211, 153));
+            BtnElevate.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            BadgeAdminStatus.Background = new SolidColorBrush(Color.FromRgb(120, 53, 15));
+            TxtAdminIcon.Text = "⚠️";
+            TxtAdminStatus.Text = "STANDARD USER";
+            TxtAdminStatus.Foreground = new SolidColorBrush(Color.FromRgb(251, 191, 36));
+            BtnElevate.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void BtnElevate_Click(object sender, RoutedEventArgs e)
+    {
+        RestartAsAdministrator();
+    }
+
+    private void RestartAsAdministrator()
+    {
+        try
+        {
+            string? exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath))
+            {
+                exePath = Environment.GetCommandLineArgs()[0];
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = exePath,
+                UseShellExecute = true,
+                Verb = "runas"
+            };
+
+            Process.Start(startInfo);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not restart application with elevated privileges: {ex.Message}",
+                "Elevation Notice", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void BtnScanDrives_Click(object sender, RoutedEventArgs e)
+    {
+        if (!DeviceManager.IsAdministrator())
+        {
+            var result = MessageBox.Show(
+                "Accessing physical hard drives directly requires Administrator privileges.\n\nWould you like to restart Linux Reader as Administrator now?",
+                "Administrator Rights Required",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                RestartAsAdministrator();
+                return;
+            }
+        }
+
+        ScanPhysicalDrives(autoSelectFirstLinux: true);
+    }
+
+    private void ScanPhysicalDrives(bool autoSelectFirstLinux)
+    {
+        try
+        {
+            TxtStatus.Text = "Scanning physical hard drives in strict read-only mode...";
+            var drives = DeviceManager.GetPhysicalDrives();
+
+            if (drives.Count == 0)
+            {
+                TxtStatus.Text = "No physical drives detected.";
+                MessageBox.Show(
+                    "No physical drives detected on this machine.\nTip: You can open disk image files (.img, .iso, .ext4) directly.",
+                    "Scan Hard Drives", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var sourceList = new List<SourceItem>();
+            int firstLinuxIndex = -1;
+
+            foreach (var drive in drives)
+            {
+                if (!drive.IsAccessible)
+                {
+                    sourceList.Add(new SourceItem
+                    {
+                        DisplayName = $"🔒 {drive.FriendlyName} ({drive.FormattedSize}) [Requires Admin]",
+                        PathOrDevice = drive.DevicePath,
+                        IsImage = false,
+                        Partition = null,
+                        IsAccessible = false
+                    });
+                    continue;
+                }
+
+                try
+                {
+                    using var probeStream = SafeDiskStream.OpenPhysicalDrive(drive.DevicePath, drive.SizeBytes);
+                    var partitions = PartitionScanner.Scan(probeStream);
+
+                    if (partitions.Count == 0)
+                    {
+                        sourceList.Add(new SourceItem
+                        {
+                            DisplayName = $"💾 {drive.FriendlyName} ({drive.FormattedSize}) [No recognized partitions]",
+                            PathOrDevice = drive.DevicePath,
+                            IsImage = false,
+                            Partition = null,
+                            IsAccessible = true
+                        });
+                    }
+                    else
+                    {
+                        foreach (var p in partitions)
+                        {
+                            string linuxBadge = p.IsLinux ? " 🐧 [Linux Ext4]" : "";
+                            sourceList.Add(new SourceItem
+                            {
+                                DisplayName = $"💾 {drive.FriendlyName} - Part {p.PartitionIndex}: {p.Name} ({p.FormattedSize}){linuxBadge}",
+                                PathOrDevice = drive.DevicePath,
+                                Partition = p,
+                                IsImage = false,
+                                IsAccessible = true
+                            });
+
+                            if (firstLinuxIndex == -1 && p.IsLinux)
+                            {
+                                firstLinuxIndex = sourceList.Count - 1;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    sourceList.Add(new SourceItem
+                    {
+                        DisplayName = $"⚠️ {drive.FriendlyName} - [Error reading partitions: {ex.Message}]",
+                        PathOrDevice = drive.DevicePath,
+                        IsImage = false,
+                        Partition = null,
+                        IsAccessible = false
+                    });
+                }
+            }
+
+            if (sourceList.Count == 0)
+            {
+                TxtStatus.Text = "No readable partitions found.";
+                return;
+            }
+
+            CmbSources.ItemsSource = sourceList;
+
+            if (autoSelectFirstLinux && firstLinuxIndex >= 0)
+            {
+                CmbSources.SelectedIndex = firstLinuxIndex;
+                TxtStatus.Text = $"Detected {drives.Count} drive(s). Automatically mounted Linux partition.";
+            }
+            else
+            {
+                CmbSources.SelectedIndex = 0;
+                TxtStatus.Text = $"Detected {drives.Count} drive(s) with {sourceList.Count} source partition(s).";
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to scan physical drives: {ex.Message}", "Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            TxtStatus.Text = $"Scan failed: {ex.Message}";
+        }
+    }
+
     private void BtnOpenImage_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
@@ -55,52 +258,20 @@ public partial class MainWindow : Window
         }
     }
 
-    private void BtnScanDrives_Click(object sender, RoutedEventArgs e)
-    {
-        TxtStatus.Text = "Scanning physical hard drives (Read-Only mode)...";
-        var drives = DeviceManager.GetPhysicalDrives();
-
-        var sources = new List<SourceItem>();
-        foreach (var drive in drives)
-        {
-            string accessSuffix = drive.IsAccessible ? "" : " [Requires Admin]";
-            sources.Add(new SourceItem
-            {
-                DisplayName = $"{drive.FriendlyName} ({drive.FormattedSize}){accessSuffix}",
-                PathOrDevice = drive.DevicePath,
-                IsImage = false
-            });
-        }
-
-        if (sources.Count == 0)
-        {
-            MessageBox.Show(
-                "No accessible physical drives detected.\n\nTip: Run this application as Administrator to inspect raw physical disks directly.",
-                "Drives Scan", MessageBoxButton.OK, MessageBoxImage.Information);
-            TxtStatus.Text = "No physical drives detected.";
-            return;
-        }
-
-        CmbSources.ItemsSource = sources;
-        CmbSources.SelectedIndex = 0;
-        TxtStatus.Text = $"Detected {sources.Count} physical drive(s).";
-    }
-
     private void LoadDiskSource(string sourcePath, bool isImage)
     {
         try
         {
             CleanUpResources();
-            TxtStatus.Text = $"Opening {Path.GetFileName(sourcePath)} in strict read-only mode...";
+            string fileName = Path.GetFileName(sourcePath);
+            TxtStatus.Text = $"Opening {fileName} in strict read-only mode...";
 
-            _activeDiskStream = isImage
+            using var probeStream = isImage
                 ? SafeDiskStream.OpenFileImage(sourcePath)
                 : SafeDiskStream.OpenPhysicalDrive(sourcePath);
 
-            var partitions = PartitionScanner.Scan(_activeDiskStream);
+            var partitions = PartitionScanner.Scan(probeStream);
             var sourceList = new List<SourceItem>();
-
-            string baseName = isImage ? Path.GetFileName(sourcePath) : sourcePath;
 
             if (partitions.Count == 0)
             {
@@ -113,13 +284,14 @@ public partial class MainWindow : Window
             for (int i = 0; i < partitions.Count; i++)
             {
                 var p = partitions[i];
-                string linuxBadge = p.IsLinux ? " [Linux Ext4]" : "";
+                string linuxBadge = p.IsLinux ? " 🐧 [Linux Ext4]" : "";
                 sourceList.Add(new SourceItem
                 {
-                    DisplayName = $"{baseName} - Part {p.PartitionIndex}: {p.Name} ({p.FormattedSize}){linuxBadge}",
+                    DisplayName = $"📂 {fileName} - Part {p.PartitionIndex}: {p.Name} ({p.FormattedSize}){linuxBadge}",
                     PathOrDevice = sourcePath,
                     Partition = p,
-                    IsImage = isImage
+                    IsImage = isImage,
+                    IsAccessible = true
                 });
 
                 if (bestLinuxIndex == -1 && p.IsLinux)
@@ -130,7 +302,7 @@ public partial class MainWindow : Window
 
             CmbSources.ItemsSource = sourceList;
             CmbSources.SelectedIndex = bestLinuxIndex >= 0 ? bestLinuxIndex : 0;
-            TxtStatus.Text = $"Loaded {sourceList.Count} partition(s). Ready.";
+            TxtStatus.Text = $"Loaded {sourceList.Count} partition(s) from {fileName}. Ready.";
         }
         catch (Exception ex)
         {
@@ -141,15 +313,36 @@ public partial class MainWindow : Window
 
     private void CmbSources_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (CmbSources.SelectedItem is not SourceItem item || item.Partition == null || _activeDiskStream == null)
+        if (CmbSources.SelectedItem is not SourceItem item)
         {
+            return;
+        }
+
+        if (!item.IsAccessible || item.Partition == null)
+        {
+            CleanUpResources();
+            DirTreeView.Items.Clear();
+            LstFiles.ItemsSource = null;
+            TxtStatus.Text = item.Partition == null
+                ? "Selected item has no readable filesystem partition."
+                : "Selected source is not accessible (Administrator privileges required).";
+            TxtPreview.Text = "// Select an accessible Linux Ext4 partition to inspect files...";
             return;
         }
 
         try
         {
             var p = item.Partition;
-            TxtStatus.Text = $"Mounting partition {p.PartitionIndex} ({p.Name})...";
+            TxtStatus.Text = $"Mounting partition {p.PartitionIndex} ({p.Name}) in read-only mode...";
+
+            if (_activeDiskStream == null || _activeDevicePath != item.PathOrDevice)
+            {
+                _activeDiskStream?.Dispose();
+                _activeDiskStream = item.IsImage
+                    ? SafeDiskStream.OpenFileImage(item.PathOrDevice)
+                    : SafeDiskStream.OpenPhysicalDrive(item.PathOrDevice);
+                _activeDevicePath = item.PathOrDevice;
+            }
 
             var partStream = new SubStream(_activeDiskStream, p.StartOffset, p.Length, leaveOpen: true);
             _activeFileSystem?.Dispose();
@@ -159,13 +352,18 @@ public partial class MainWindow : Window
             PopulateRootTree();
             LoadDirectory("/");
 
-            TxtStatus.Text = $"Mounted Ext4 volume: '{_activeFileSystem.Superblock.VolumeName}' (Block size: {_activeFileSystem.BlockSize} B). Read-only.";
+            string volName = string.IsNullOrWhiteSpace(_activeFileSystem.Superblock.VolumeName)
+                ? "<unnamed>"
+                : _activeFileSystem.Superblock.VolumeName;
+            TxtStatus.Text = $"Mounted Ext4 volume: '{volName}' (Block size: {_activeFileSystem.BlockSize} B). Strict Read-Only.";
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Partition mount error: {ex.Message}";
+            TxtStatus.Text = $"Partition mount notice: {ex.Message}";
             DirTreeView.Items.Clear();
             LstFiles.ItemsSource = null;
+            ClearSelection();
+            TxtPreview.Text = $"[Partition {item.Partition.PartitionIndex}: {item.Partition.FileSystemType}]\nThis partition does not contain a supported Ext2/Ext3/Ext4 filesystem.\n\nTip: Select a partition with the 🐧 [Linux Ext4] badge to browse files.";
         }
     }
 
@@ -416,6 +614,7 @@ public partial class MainWindow : Window
         _activeFileSystem = null;
         _activeDiskStream?.Dispose();
         _activeDiskStream = null;
+        _activeDevicePath = null;
         _currentFolderItems.Clear();
         ClearSelection();
     }

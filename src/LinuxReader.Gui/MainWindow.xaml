@@ -5,8 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Linux File Reader for Windows (Strict Read-Only)" 
-        Height="720" Width="1100" MinHeight="500" MinWidth="800"
+        Icon="Assets/app.ico"
+        Height="740" Width="1140" MinHeight="520" MinWidth="850"
         WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded"
         FontFamily="Segoe UI" FontSize="13"
         Background="#F4F6F9">
 
@@ -19,7 +21,7 @@
         </Grid.RowDefinitions>
 
         <!-- 1. Header Bar -->
-        <Border Grid.Row="0" Background="#1E293B" Padding="16,12">
+        <Border Grid.Row="0" Background="#1E293B" Padding="16,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -27,27 +29,48 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="🐧" FontSize="22" Margin="0,0,10,0"/>
-                    <StackPanel>
+                    <Image Source="Assets/app.png" Width="36" Height="36" Margin="0,0,12,0" 
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Linux File Reader for Windows" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
                         <TextBlock Text="Safe, Direct, Non-Destructive Ext2/Ext3/Ext4 Access" FontSize="11" Foreground="#94A3B8"/>
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Strict Read-Only Badge -->
-                <Border Grid.Column="1" Background="#065F46" CornerRadius="12" Padding="10,4" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🛡️" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="STRICT READ-ONLY MODE" FontWeight="Bold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
+                <!-- Status Badges & Admin Actions -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Admin Status Indicator -->
+                    <Border x:Name="BadgeAdminStatus" Background="#065F46" CornerRadius="12" Padding="10,4" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="TxtAdminIcon" Text="🛡️" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtAdminStatus" Text="ADMINISTRATOR MODE" FontWeight="Bold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Button x:Name="BtnElevate" Content="🛡️ Restart as Administrator" Click="BtnElevate_Click" Visibility="Collapsed"
+                            Padding="10,4" Background="#D97706" Foreground="White" BorderThickness="0" Cursor="Hand" FontWeight="SemiBold" FontSize="11" Margin="0,0,8,0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="12"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <!-- Strict Read-Only Badge -->
+                    <Border Background="#1E3A8A" CornerRadius="12" Padding="10,4">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔒" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="STRICT READ-ONLY" FontWeight="Bold" FontSize="11" Foreground="#93C5FD" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
         <!-- 2. Action Toolbar -->
         <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,8">
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="BtnOpenImage" Content="📂 Open Disk Image (.img, .raw, .iso)..." Click="BtnOpenImage_Click" 
+                <Button x:Name="BtnOpenImage" Content="📂 Open Disk Image (.img, .raw, .iso, .ext4)..." Click="BtnOpenImage_Click" 
                         Padding="12,6" Background="#2563EB" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
                     <Button.Resources>
                         <Style TargetType="Border">
@@ -81,7 +104,7 @@
         <!-- 3. Main Workspace Splitter -->
         <Grid Grid.Row="2" Margin="12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="200"/>
+                <ColumnDefinition Width="300" MinWidth="220"/>
                 <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="*" MinWidth="350"/>
                 <ColumnDefinition Width="4"/>
