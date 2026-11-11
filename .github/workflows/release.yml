@@ -52,13 +52,21 @@ jobs:
           Compress-Archive -Path ./artifacts/gui-win-x64/LinuxReader.exe -DestinationPath ./dist/LinuxReader-GUI-win-x64.zip
           Compress-Archive -Path ./artifacts/cli-win-x64/linux-reader-cli.exe -DestinationPath ./dist/LinuxReader-CLI-win-x64.zip
           
-          # Compile Inno Setup Windows Installer
-          Write-Host "Compiling Inno Setup Windows Installer..."
-          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
-          if (-not $iscc) {
-            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          # Refresh Path for Chocolatey and locate ISCC
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          $isccCandidates = @(
+            (Get-Command iscc -ErrorAction SilentlyContinue)?.Source,
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { $_ -and (Test-Path $_) }
+
+          $iscc = $isccCandidates | Select-Object -First 1
+          if ($iscc) {
+            Write-Host "Found ISCC at: $iscc"
+            & $iscc installer/setup.iss
+          } else {
+            throw "ISCC compiler not found after installing Inno Setup!"
           }
-          & $iscc installer/setup.iss
 
           # Generate SHA256 checksums
           Get-FileHash -Algorithm SHA256 ./dist/* | Where-Object { $_.Path -notlike "*.txt" } | ForEach-Object {
