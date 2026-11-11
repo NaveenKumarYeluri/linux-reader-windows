@@ -66,9 +66,14 @@ jobs:
             Write-Host "Compiling Inno Setup Windows Installer using: $iscc"
             Push-Location installer
             try {
-              & $iscc setup.iss
+              $p = Start-Process -FilePath $iscc -ArgumentList "setup.iss" -Wait -NoNewWindow -PassThru -RedirectStandardOutput "iscc_out.log" -RedirectStandardError "iscc_err.log"
+              Write-Host "--- ISCC STDOUT ---"
+              Get-Content "iscc_out.log" -ErrorAction SilentlyContinue | Write-Host
+              Write-Host "--- ISCC STDERR ---"
+              Get-Content "iscc_err.log" -ErrorAction SilentlyContinue | Write-Host
+              Write-Host "ISCC Process Exit Code: $($p.ExitCode)"
             } catch {
-              Write-Warning "Inno Setup compiler error: $_"
+              Write-Warning "Inno Setup execution error: $_"
             } finally {
               Pop-Location
             }
