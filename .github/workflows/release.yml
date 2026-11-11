@@ -42,17 +42,21 @@ jobs:
             /p:IncludeNativeLibrariesForSelfExtract=true `
             --output ./artifacts/cli-win-x64
 
-      - name: Install Inno Setup
-        run: choco install innosetup --no-progress
-
-      - name: Package Archives & Windows Setup Installer
+      - name: Package ZIP Archives
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path ./dist
-          Compress-Archive -Path ./artifacts/gui-win-x64/LinuxReader.exe -DestinationPath ./dist/LinuxReader-GUI-win-x64.zip
-          Compress-Archive -Path ./artifacts/cli-win-x64/linux-reader-cli.exe -DestinationPath ./dist/LinuxReader-CLI-win-x64.zip
-          
-          # Refresh Path for Chocolatey and locate ISCC
+          Compress-Archive -Force -Path ./artifacts/gui-win-x64/LinuxReader.exe -DestinationPath ./dist/LinuxReader-GUI-win-x64.zip
+          Compress-Archive -Force -Path ./artifacts/cli-win-x64/linux-reader-cli.exe -DestinationPath ./dist/LinuxReader-CLI-win-x64.zip
+
+      - name: Install Inno Setup
+        continue-on-error: true
+        run: choco install innosetup --no-progress
+
+      - name: Compile Windows Setup Installer
+        continue-on-error: true
+        shell: pwsh
+        run: |
           $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
           $isccCandidates = @(
             "C:\ProgramData\chocolatey\bin\iscc.exe",
@@ -65,25 +69,17 @@ jobs:
           if ($iscc) {
             Write-Host "Compiling Inno Setup Windows Installer using: $iscc"
             Push-Location installer
-            try {
-              $p = Start-Process -FilePath $iscc -ArgumentList "setup.iss" -Wait -NoNewWindow -PassThru -RedirectStandardOutput "iscc_out.log" -RedirectStandardError "iscc_err.log"
-              Write-Host "--- ISCC STDOUT ---"
-              Get-Content "iscc_out.log" -ErrorAction SilentlyContinue | Write-Host
-              Write-Host "--- ISCC STDERR ---"
-              Get-Content "iscc_err.log" -ErrorAction SilentlyContinue | Write-Host
-              Write-Host "ISCC Process Exit Code: $($p.ExitCode)"
-            } catch {
-              Write-Warning "Inno Setup execution error: $_"
-            } finally {
-              Pop-Location
-            }
+            & $iscc setup.iss
+            Pop-Location
           } else {
-            Write-Warning "ISCC not found, proceeding with ZIP releases."
+            Write-Warning "ISCC not found, skipping installer compilation."
           }
 
-          # Generate SHA256 checksums
-          Get-FileHash -Algorithm SHA256 ./dist/* | Where-Object { $_.Path -notlike "*.txt" } | ForEach-Object {
-            "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))"
+      - name: Generate Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path ./dist -File | Where-Object { $_.Name -notlike "*.txt" } | Get-FileHash -Algorithm SHA256 | ForEach-Object {
+            "$($_.Hash)  $($_.Path | Split-Path -Leaf)"
           } | Out-File -FilePath ./dist/SHA256SUMS.txt -Encoding utf8
 
       - name: Create GitHub Release
@@ -94,6 +90,9 @@ jobs:
             ./dist/*.exe
             ./dist/*.zip
             ./dist/*.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true
           draft: false
           prerelease: false
           generate_release_notes: true
