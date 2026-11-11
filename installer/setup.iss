@@ -33,7 +33,7 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 [Files]
 Source: "..\artifacts\gui-win-x64\LinuxReader.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\artifacts\cli-win-x64\linux-reader-cli.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\src\LinuxReader.Gui\Assets\app.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "setup.ico"; DestDir: "{app}"; DestName: "app.ico"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"

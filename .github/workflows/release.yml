@@ -64,7 +64,14 @@ jobs:
           $iscc = $isccCandidates | Select-Object -First 1
           if ($iscc) {
             Write-Host "Compiling Inno Setup Windows Installer using: $iscc"
-            & $iscc installer/setup.iss
+            Push-Location installer
+            try {
+              & $iscc setup.iss
+            } catch {
+              Write-Warning "Inno Setup compiler error: $_"
+            } finally {
+              Pop-Location
+            }
           } else {
             Write-Warning "ISCC not found, proceeding with ZIP releases."
           }
