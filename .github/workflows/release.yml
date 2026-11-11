@@ -1,0 +1,67 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Build Standalone Binaries
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish GUI Application (Single-File Standalone win-x64)
+        run: |
+          dotnet publish src/LinuxReader.Gui/LinuxReader.Gui.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=true `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
+            --output ./artifacts/gui-win-x64
+
+      - name: Publish CLI Application (Single-File Standalone win-x64)
+        run: |
+          dotnet publish src/LinuxReader.Cli/LinuxReader.Cli.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=true `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
+            --output ./artifacts/cli-win-x64
+
+      - name: Package Archives
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./dist
+          Compress-Archive -Path ./artifacts/gui-win-x64/LinuxReader.exe -DestinationPath ./dist/LinuxReader-GUI-win-x64.zip
+          Compress-Archive -Path ./artifacts/cli-win-x64/linux-reader-cli.exe -DestinationPath ./dist/LinuxReader-CLI-win-x64.zip
+          
+          # Generate SHA256 checksums
+          Get-FileHash -Algorithm SHA256 ./dist/*.zip | ForEach-Object {
+            "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))"
+          } | Out-File -FilePath ./dist/SHA256SUMS.txt -Encoding utf8
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ./dist/LinuxReader-GUI-win-x64.zip
+            ./dist/LinuxReader-CLI-win-x64.zip
+            ./dist/SHA256SUMS.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true

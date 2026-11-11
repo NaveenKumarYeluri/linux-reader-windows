@@ -1,0 +1,30 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build & Test (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore LinuxReader.sln
+
+      - name: Build Solution (Release)
+        run: dotnet build LinuxReader.sln --no-restore --configuration Release
+
+      - name: Run Unit & Integration Tests
+        run: dotnet test LinuxReader.sln --no-build --configuration Release --verbosity normal

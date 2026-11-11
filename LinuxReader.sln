@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{300BB690-92FD-4D6F-8461-B612DE914B24}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinuxReader.Core", "src\LinuxReader.Core\LinuxReader.Core.csproj", "{30500E54-475C-4636-A0D2-978183D608CF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinuxReader.Cli", "src\LinuxReader.Cli\LinuxReader.Cli.csproj", "{2305DB66-45F4-4F98-A0FC-B616737AAD6F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{7B206AE2-B276-4064-8E00-E452EBE3F1C5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinuxReader.Tests", "tests\LinuxReader.Tests\LinuxReader.Tests.csproj", "{E4F450DA-AE31-4B9F-94DA-AA55A69DFC06}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinuxReader.Gui", "src\LinuxReader.Gui\LinuxReader.Gui.csproj", "{19F223A5-DBA3-4827-B1A3-72D7761ACE1A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{30500E54-475C-4636-A0D2-978183D608CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30500E54-475C-4636-A0D2-978183D608CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30500E54-475C-4636-A0D2-978183D608CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30500E54-475C-4636-A0D2-978183D608CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2305DB66-45F4-4F98-A0FC-B616737AAD6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2305DB66-45F4-4F98-A0FC-B616737AAD6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2305DB66-45F4-4F98-A0FC-B616737AAD6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2305DB66-45F4-4F98-A0FC-B616737AAD6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E4F450DA-AE31-4B9F-94DA-AA55A69DFC06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4F450DA-AE31-4B9F-94DA-AA55A69DFC06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4F450DA-AE31-4B9F-94DA-AA55A69DFC06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4F450DA-AE31-4B9F-94DA-AA55A69DFC06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19F223A5-DBA3-4827-B1A3-72D7761ACE1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19F223A5-DBA3-4827-B1A3-72D7761ACE1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19F223A5-DBA3-4827-B1A3-72D7761ACE1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19F223A5-DBA3-4827-B1A3-72D7761ACE1A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{30500E54-475C-4636-A0D2-978183D608CF} = {300BB690-92FD-4D6F-8461-B612DE914B24}
+		{2305DB66-45F4-4F98-A0FC-B616737AAD6F} = {300BB690-92FD-4D6F-8461-B612DE914B24}
+		{E4F450DA-AE31-4B9F-94DA-AA55A69DFC06} = {7B206AE2-B276-4064-8E00-E452EBE3F1C5}
+		{19F223A5-DBA3-4827-B1A3-72D7761ACE1A} = {300BB690-92FD-4D6F-8461-B612DE914B24}
+	EndGlobalSection
+EndGlobal

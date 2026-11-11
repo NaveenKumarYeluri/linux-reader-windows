@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <Authors>Naveen</Authors>
+    <Product>Linux File Reader for Windows</Product>
+    <Description>Safe, read-only Ext2/Ext3/Ext4 partition and disk image reader for Windows.</Description>
+  </PropertyGroup>
+
+</Project>
