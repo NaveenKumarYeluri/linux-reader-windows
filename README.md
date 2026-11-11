@@ -179,13 +179,14 @@ dotnet publish src/LinuxReader.Cli/LinuxReader.Cli.csproj -c Release -r win-x64 
 
 ## 🌟 Credits & Acknowledgments
 
-- **Lead Developer & Maintainer**: [Naveen Kumar Yeluri](https://github.com/NaveenKumarYeluri)
+- **Project Lead & Maintainer**: [Naveen Kumar Yeluri](https://github.com/NaveenKumarYeluri)
+- **Engineered & Developed by**: **Antigravity** (Advanced Agentic AI Assistant, Google DeepMind)
 - **Technical Standards**:
   - The [Linux Kernel Documentation on Ext4](https://docs.kernel.org/filesystems/ext4/index.html)
   - Unified Extensible Firmware Interface (UEFI) GPT specifications
   - Microsoft Windows Storage and Win32 Device Management APIs
-- **Inspiration**:
-  - Developed to provide a modern, completely driverless, strictly read-only, non-destructive utility for accessing Linux files on Windows machines.
+- **Inspiration & Philosophy**:
+  - Engineered from first principles to provide a completely driverless, strictly read-only, non-destructive utility for accessing Linux files and physical dual-boot drives on Windows machines.
 
 ---
 
