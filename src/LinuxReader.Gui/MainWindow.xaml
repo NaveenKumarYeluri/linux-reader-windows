@@ -6,9 +6,12 @@
         mc:Ignorable="d"
         Title="Linux File Reader for Windows (Strict Read-Only)" 
         Icon="Assets/app.ico"
-        Height="740" Width="1140" MinHeight="520" MinWidth="850"
+        Height="760" Width="1180" MinHeight="540" MinWidth="880"
         WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        Drop="Window_Drop"
         FontFamily="Segoe UI" FontSize="13"
         Background="#F4F6F9">
 
@@ -69,36 +72,46 @@
 
         <!-- 2. Action Toolbar -->
         <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="12,8">
-            <StackPanel Orientation="Horizontal">
-                <Button x:Name="BtnOpenImage" Content="📂 Open Disk Image (.img, .raw, .iso, .ext4)..." Click="BtnOpenImage_Click" 
-                        Padding="12,6" Background="#2563EB" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="4"/>
-                        </Style>
-                    </Button.Resources>
-                </Button>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <Button x:Name="BtnScanDrives" Content="🔍 Scan Physical Hard Drives" Click="BtnScanDrives_Click" 
-                        Padding="12,6" Background="#0F172A" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="4"/>
-                        </Style>
-                    </Button.Resources>
-                </Button>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BtnOpenImage" Content="📂 Open Disk Image..." Click="BtnOpenImage_Click" 
+                            Padding="12,6" Background="#2563EB" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
 
-                <Separator Width="1" Background="#CBD5E1" Margin="8,4"/>
+                    <Button x:Name="BtnScanDrives" Content="🔍 Scan Physical Hard Drives" Click="BtnScanDrives_Click" 
+                            Padding="12,6" Background="#0F172A" Foreground="White" BorderThickness="0" Cursor="Hand" Margin="0,0,8,0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
 
-                <Button x:Name="BtnExport" Content="💾 Export Selected..." Click="BtnExport_Click" 
-                        Padding="12,6" Background="#059669" Foreground="White" BorderThickness="0" Cursor="Hand" IsEnabled="False" Margin="0,0,8,0">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="4"/>
-                        </Style>
-                    </Button.Resources>
-                </Button>
-            </StackPanel>
+                    <Separator Width="1" Background="#CBD5E1" Margin="8,4"/>
+
+                    <Button x:Name="BtnExport" Content="💾 Export Selected..." Click="BtnExport_Click" 
+                            Padding="12,6" Background="#059669" Foreground="White" BorderThickness="0" Cursor="Hand" IsEnabled="False" Margin="0,0,8,0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </StackPanel>
+
+                <TextBlock Grid.Column="1" Text="💡 Tip: Drag &amp; drop any .img, .iso, or .raw disk file here" 
+                           Foreground="#64748B" FontSize="11" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            </Grid>
         </Border>
 
         <!-- 3. Main Workspace Splitter -->
@@ -108,7 +121,7 @@
                 <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="*" MinWidth="350"/>
                 <ColumnDefinition Width="4"/>
-                <ColumnDefinition Width="320" MinWidth="220"/>
+                <ColumnDefinition Width="340" MinWidth="260"/>
             </Grid.ColumnDefinitions>
 
             <!-- Left Panel: Disks, Partitions & Folder Navigation -->
@@ -149,20 +162,36 @@
                             <ColumnDefinition Width="180"/>
                         </Grid.ColumnDefinitions>
 
-                        <Border Grid.Column="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
-                            <TextBlock x:Name="TxtCurrentPath" Text="/" FontWeight="SemiBold" Foreground="#1E293B" VerticalAlignment="Center"/>
+                        <!-- Clickable Interactive Breadcrumbs -->
+                        <Border Grid.Column="0" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="4" Padding="6,3" Margin="0,0,8,0">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="PanelBreadcrumbs" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="📁 /" Padding="4,2" Background="Transparent" BorderThickness="0" Cursor="Hand" FontWeight="SemiBold" Foreground="#1E293B"/>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
 
                         <TextBox x:Name="TxtSearch" Grid.Column="1" TextChanged="TxtSearch_TextChanged" 
                                  Padding="6,4" ToolTip="Filter files in current folder..."/>
                     </Grid>
 
-                    <!-- Files Table -->
+                    <!-- Files Table with Context Menu -->
                     <ListView x:Name="LstFiles" Grid.Row="1" SelectionChanged="LstFiles_SelectionChanged" 
                               MouseDoubleClick="LstFiles_MouseDoubleClick" BorderThickness="0">
+                        <ListView.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem x:Name="CtxOpenDefault" Header="🚀 Open with Windows Default App" Click="CtxOpenDefault_Click"/>
+                                <MenuItem x:Name="CtxExport" Header="💾 Export to Windows Folder..." Click="BtnExport_Click"/>
+                                <Separator/>
+                                <MenuItem x:Name="CtxCopyPath" Header="📋 Copy Linux Path" Click="CtxCopyPath_Click"/>
+                                <MenuItem x:Name="CtxCopyContent" Header="📄 Copy File Content" Click="CtxCopyContent_Click"/>
+                                <Separator/>
+                                <MenuItem x:Name="CtxProperties" Header="ℹ️ View Inode &amp; Metadata Details" Click="CtxProperties_Click"/>
+                            </ContextMenu>
+                        </ListView.ContextMenu>
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="Name" Width="220" DisplayMemberBinding="{Binding Name}"/>
+                                <GridViewColumn Header="Name" Width="230" DisplayMemberBinding="{Binding Name}"/>
                                 <GridViewColumn Header="Size" Width="90" DisplayMemberBinding="{Binding FormattedSize}"/>
                                 <GridViewColumn Header="Permissions" Width="100" DisplayMemberBinding="{Binding Permissions}"/>
                                 <GridViewColumn Header="Modified" Width="140" DisplayMemberBinding="{Binding ModifiedFormatted}"/>
@@ -175,7 +204,7 @@
 
             <GridSplitter Grid.Column="3" HorizontalAlignment="Stretch" Background="#E2E8F0" Width="4"/>
 
-            <!-- Right Panel: File Preview & Inspector -->
+            <!-- Right Panel: Multi-Format Preview & Inspector -->
             <Border Grid.Column="4" Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="12">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -195,19 +224,63 @@
                         <TextBlock x:Name="TxtDetailInode" Text="" Foreground="#334155" FontSize="12"/>
                     </StackPanel>
 
-                    <!-- Text Preview -->
-                    <Border Grid.Row="2" Background="#0F172A" CornerRadius="4" Padding="8" Margin="0,0,0,10">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                            <TextBox x:Name="TxtPreview" Text="// File Preview will appear here..." 
-                                     Background="Transparent" Foreground="#E2E8F0" FontFamily="Consolas" FontSize="11" 
-                                     BorderThickness="0" IsReadOnly="True" TextWrapping="Wrap"/>
-                        </ScrollViewer>
-                    </Border>
+                    <!-- Multi-Format Previewer (Text, Hex, Image) -->
+                    <Grid Grid.Row="2" Margin="0,0,0,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-                    <!-- Export Actions -->
+                        <!-- View Selector Tabs -->
+                        <Border Grid.Row="0" Background="#F1F5F9" CornerRadius="4,4,0,0" Padding="4,3" BorderBrush="#E2E8F0" BorderThickness="1,1,1,0">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="RbViewText" Content="📝 Text" IsChecked="True" Checked="RbViewMode_Checked" Margin="4,2,8,2" FontSize="11" Cursor="Hand"/>
+                                <RadioButton x:Name="RbViewHex" Content="🔢 Hex" Checked="RbViewMode_Checked" Margin="0,2,8,2" FontSize="11" Cursor="Hand"/>
+                                <RadioButton x:Name="RbViewImage" Content="🖼️ Image" Checked="RbViewMode_Checked" Margin="0,2,4,2" FontSize="11" Cursor="Hand"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Preview Container -->
+                        <Border Grid.Row="1" Background="#0F172A" CornerRadius="0,0,4,4" Padding="8">
+                            <Grid>
+                                <!-- Text & Hex Dump Viewer -->
+                                <ScrollViewer x:Name="ScrollTextHex" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                                    <TextBox x:Name="TxtPreview" Text="// File Preview will appear here..." 
+                                             Background="Transparent" Foreground="#E2E8F0" FontFamily="Consolas" FontSize="11" 
+                                             BorderThickness="0" IsReadOnly="True" TextWrapping="Wrap"/>
+                                </ScrollViewer>
+
+                                <!-- Image Viewer -->
+                                <ScrollViewer x:Name="ScrollImage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                                    <Image x:Name="ImgPreview" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Quick Action Buttons -->
                     <StackPanel Grid.Row="3" Orientation="Vertical">
+                        <Button x:Name="BtnOpenWith" Content="🚀 Open in Windows App" Click="BtnOpenWith_Click"
+                                Padding="10,6" Background="#0F172A" Foreground="White" BorderThickness="0" Cursor="Hand" IsEnabled="False" Margin="0,0,0,6">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+
                         <Button x:Name="BtnQuickExport" Content="⬇️ Export to Windows Folder" Click="BtnExport_Click"
-                                Padding="10,6" Background="#2563EB" Foreground="White" BorderThickness="0" Cursor="Hand" IsEnabled="False">
+                                Padding="10,6" Background="#2563EB" Foreground="White" BorderThickness="0" Cursor="Hand" IsEnabled="False" Margin="0,0,0,6">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+
+                        <Button x:Name="BtnCopyPath" Content="📋 Copy Linux Path" Click="BtnCopyPath_Click"
+                                Padding="10,4" Background="#F1F5F9" Foreground="#334155" BorderBrush="#CBD5E1" BorderThickness="1" Cursor="Hand" IsEnabled="False" FontSize="11">
                             <Button.Resources>
                                 <Style TargetType="Border">
                                     <Setter Property="CornerRadius" Value="4"/>

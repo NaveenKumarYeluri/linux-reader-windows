@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using LinuxReader.Core.Ext4;
 using LinuxReader.Core.IO;
 using LinuxReader.Core.Partitions;
@@ -19,6 +20,9 @@ public partial class MainWindow : Window
     private Ext4FileSystem? _activeFileSystem;
     private List<Ext4Item> _currentFolderItems = new();
     private Ext4Item? _selectedItem;
+    private string? _cachedTextPreview;
+    private string? _cachedHexPreview;
+    private BitmapImage? _cachedImagePreview;
 
     public class SourceItem
     {
@@ -422,13 +426,37 @@ public partial class MainWindow : Window
         }
     }
 
+    private void Window_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0 && File.Exists(files[0]))
+            {
+                LoadDiskSource(files[0], isImage: true);
+            }
+        }
+    }
+
     private void LoadDirectory(string path)
     {
         if (_activeFileSystem == null) return;
 
         try
         {
-            TxtCurrentPath.Text = path;
+            UpdateBreadcrumbs(path);
             _currentFolderItems = _activeFileSystem.ListDirectory(path);
 
             ApplyFilter();
@@ -440,6 +468,83 @@ public partial class MainWindow : Window
         }
     }
 
+    private void UpdateBreadcrumbs(string path)
+    {
+        PanelBreadcrumbs.Children.Clear();
+
+        var rootBtn = new Button
+        {
+            Content = "📁 /",
+            Padding = new Thickness(4, 2, 4, 2),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            FontWeight = path == "/" ? FontWeights.Bold : FontWeights.Normal,
+            Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+            Tag = "/"
+        };
+        rootBtn.Click += (s, e) => LoadDirectory("/");
+        PanelBreadcrumbs.Children.Add(rootBtn);
+
+        if (path == "/" || string.IsNullOrWhiteSpace(path)) return;
+
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string accumPath = "";
+
+        for (int i = 0; i < segments.Length; i++)
+        {
+            string seg = segments[i];
+            accumPath += "/" + seg;
+            string target = accumPath;
+            bool isLast = (i == segments.Length - 1);
+
+            var sep = new TextBlock
+            {
+                Text = " › ",
+                Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 2, 0)
+            };
+            PanelBreadcrumbs.Children.Add(sep);
+
+            var segBtn = new Button
+            {
+                Content = seg,
+                Padding = new Thickness(4, 2, 4, 2),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                FontWeight = isLast ? FontWeights.Bold : FontWeights.Normal,
+                Foreground = isLast 
+                    ? new SolidColorBrush(Color.FromRgb(37, 99, 235)) 
+                    : new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+                Tag = target
+            };
+            segBtn.Click += (s, e) => LoadDirectory(target);
+            PanelBreadcrumbs.Children.Add(segBtn);
+        }
+    }
+
+    private static string GetFileIcon(Ext4Item item)
+    {
+        if (item.IsDirectory) return "📁 ";
+        if (item.IsSymlink) return "🔗 ";
+
+        string ext = Path.GetExtension(item.Name).ToLowerInvariant();
+        return ext switch
+        {
+            ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".ico" or ".svg" or ".webp" => "🖼️ ",
+            ".sh" or ".bash" or ".py" or ".js" or ".ts" or ".c" or ".cpp" or ".h" or ".rs" or ".go" or ".java" or ".cs" or ".pl" or ".php" => "⚡ ",
+            ".conf" or ".cfg" or ".ini" or ".yaml" or ".yml" or ".json" or ".toml" or ".xml" or ".service" or ".desktop" => "⚙️ ",
+            ".tar" or ".gz" or ".xz" or ".bz2" or ".zip" or ".deb" or ".rpm" or ".7z" or ".tgz" or ".iso" => "📦 ",
+            ".mp3" or ".wav" or ".flac" or ".ogg" or ".m4a" => "🎵 ",
+            ".mp4" or ".mkv" or ".avi" or ".mov" or ".webm" => "🎬 ",
+            ".so" or ".bin" or ".elf" or ".o" or ".dll" or ".exe" => "💿 ",
+            ".log" => "📜 ",
+            _ => "📄 "
+        };
+    }
+
     private void ApplyFilter()
     {
         string query = TxtSearch.Text.Trim();
@@ -449,7 +554,7 @@ public partial class MainWindow : Window
 
         var displayItems = filtered.Select(i => new DisplayFileItem
         {
-            Name = (i.IsDirectory ? "📁 " : i.IsSymlink ? "🔗 " : "📄 ") + i.Name,
+            Name = GetFileIcon(i) + i.Name,
             FormattedSize = i.FormattedSize,
             Permissions = i.Permissions,
             ModifiedFormatted = i.ModifiedTime.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -473,6 +578,8 @@ public partial class MainWindow : Window
             UpdateDetailsPane(_selectedItem);
             BtnExport.IsEnabled = true;
             BtnQuickExport.IsEnabled = true;
+            BtnOpenWith.IsEnabled = !_selectedItem.IsDirectory;
+            BtnCopyPath.IsEnabled = true;
         }
         else
         {
@@ -482,10 +589,86 @@ public partial class MainWindow : Window
 
     private void LstFiles_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (_selectedItem != null && _selectedItem.IsDirectory)
+        if (_selectedItem == null) return;
+
+        if (_selectedItem.IsDirectory)
         {
             LoadDirectory(_selectedItem.FullPath);
         }
+        else
+        {
+            OpenWithDefaultApp(_selectedItem);
+        }
+    }
+
+    private void OpenWithDefaultApp(Ext4Item item)
+    {
+        if (_activeFileSystem == null || item.IsDirectory) return;
+
+        try
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "LinuxReader_Preview");
+            Directory.CreateDirectory(tempDir);
+            string safeName = Path.GetFileName(item.Name);
+            string tempFilePath = Path.Combine(tempDir, safeName);
+
+            TxtStatus.Text = $"Extracting '{item.Name}' to open in Windows...";
+            _activeFileSystem.ExtractFile(item.Inode, tempFilePath);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = tempFilePath,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+            TxtStatus.Text = $"Opened '{item.Name}' with default application.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open file: {ex.Message}", "Open Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            TxtStatus.Text = $"Error opening file: {ex.Message}";
+        }
+    }
+
+    private static string FormatHexDump(byte[] bytes, int maxBytes = 4096)
+    {
+        int length = Math.Min(bytes.Length, maxBytes);
+        var sb = new StringBuilder();
+
+        for (int lineOffset = 0; lineOffset < length; lineOffset += 16)
+        {
+            sb.Append($"{lineOffset:X8}  ");
+
+            for (int i = 0; i < 16; i++)
+            {
+                if (i == 8) sb.Append(' ');
+                if (lineOffset + i < length)
+                {
+                    sb.Append($"{bytes[lineOffset + i]:X2} ");
+                }
+                else
+                {
+                    sb.Append("   ");
+                }
+            }
+
+            sb.Append(" |");
+
+            for (int i = 0; i < 16 && (lineOffset + i) < length; i++)
+            {
+                byte b = bytes[lineOffset + i];
+                sb.Append(b >= 32 && b <= 126 ? (char)b : '.');
+            }
+
+            sb.AppendLine("|");
+        }
+
+        if (bytes.Length > maxBytes)
+        {
+            sb.AppendLine($"\n... [Hex view truncated at {maxBytes / 1024} KB of {bytes.Length:N0} bytes] ...");
+        }
+
+        return sb.ToString();
     }
 
     private void UpdateDetailsPane(Ext4Item item)
@@ -501,53 +684,211 @@ public partial class MainWindow : Window
             TxtDetailPath.Text += $"\nPoints to: {item.SymlinkTarget}";
         }
 
-        // Preview text if size <= 512KB and is regular file
-        if (item.IsRegularFile && item.Size <= 512 * 1024 && _activeFileSystem != null)
+        _cachedTextPreview = null;
+        _cachedHexPreview = null;
+        _cachedImagePreview = null;
+
+        if (item.IsRegularFile && item.Size <= 10 * 1024 * 1024 && _activeFileSystem != null)
         {
             try
             {
-                using var stream = _activeFileSystem.OpenFile(item.Inode);
-                using var reader = new StreamReader(stream, Encoding.UTF8);
-                char[] buffer = new char[8192];
-                int read = reader.Read(buffer, 0, buffer.Length);
-                string text = new string(buffer, 0, read);
-
-                // Check for null bytes to verify if it's binary
-                if (text.Contains('\0'))
+                // Read up to 256KB for previewing text / hex / image
+                int maxRead = (int)Math.Min(item.Size, 256 * 1024);
+                byte[] buffer = new byte[maxRead];
+                using (var stream = _activeFileSystem.OpenFile(item.Inode))
                 {
-                    TxtPreview.Text = $"[Binary File - {item.Size:N0} bytes]\nDirect binary export is recommended.";
+                    int totalRead = 0;
+                    while (totalRead < maxRead)
+                    {
+                        int r = stream.Read(buffer, totalRead, maxRead - totalRead);
+                        if (r <= 0) break;
+                        totalRead += r;
+                    }
+                    if (totalRead < maxRead)
+                    {
+                        Array.Resize(ref buffer, totalRead);
+                    }
+                }
+
+                _cachedHexPreview = FormatHexDump(buffer);
+
+                string ext = Path.GetExtension(item.Name).ToLowerInvariant();
+                bool isImageExt = ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".ico";
+
+                if (isImageExt)
+                {
+                    try
+                    {
+                        using var ms = new MemoryStream(buffer);
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.StreamSource = ms;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        _cachedImagePreview = bmp;
+                    }
+                    catch
+                    {
+                        _cachedImagePreview = null;
+                    }
+                }
+
+                // Check text decode
+                bool hasNullBytes = buffer.Any(b => b == 0);
+                if (!hasNullBytes)
+                {
+                    _cachedTextPreview = Encoding.UTF8.GetString(buffer);
+                }
+
+                if (_cachedImagePreview != null)
+                {
+                    RbViewImage.IsChecked = true;
+                }
+                else if (!hasNullBytes && !string.IsNullOrEmpty(_cachedTextPreview))
+                {
+                    RbViewText.IsChecked = true;
                 }
                 else
                 {
-                    TxtPreview.Text = text + (item.Size > (ulong)read ? "\n\n... [Preview truncated to first 8KB] ..." : "");
+                    RbViewHex.IsChecked = true;
                 }
+
+                RbViewMode_Checked(this, new RoutedEventArgs());
             }
             catch (Exception ex)
             {
                 TxtPreview.Text = $"[Preview unavailable: {ex.Message}]";
+                RbViewText.IsChecked = true;
+                RbViewMode_Checked(this, new RoutedEventArgs());
             }
         }
         else if (item.IsDirectory)
         {
-            TxtPreview.Text = $"[Directory: {item.Name}]\nDouble-click to open or click 'Export' to copy entire folder tree to Windows.";
+            TxtPreview.Text = $"[Directory: {item.Name}]\nDouble-click to enter folder, or click 'Export' to copy entire folder tree to Windows.";
+            RbViewText.IsChecked = true;
+            RbViewMode_Checked(this, new RoutedEventArgs());
         }
         else
         {
-            TxtPreview.Text = $"[File size exceeds 512KB ({item.FormattedSize})]\nClick 'Export to Windows' to save this file locally.";
+            TxtPreview.Text = $"[File size exceeds 10MB ({item.FormattedSize})]\nUse 'Open in Windows App' or 'Export' to view this file.";
+            RbViewText.IsChecked = true;
+            RbViewMode_Checked(this, new RoutedEventArgs());
+        }
+    }
+
+    private void RbViewMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (ScrollTextHex == null || ScrollImage == null) return;
+
+        if (RbViewImage.IsChecked == true)
+        {
+            ScrollTextHex.Visibility = Visibility.Collapsed;
+            ScrollImage.Visibility = Visibility.Visible;
+            ImgPreview.Source = _cachedImagePreview;
+        }
+        else if (RbViewHex.IsChecked == true)
+        {
+            ScrollTextHex.Visibility = Visibility.Visible;
+            ScrollImage.Visibility = Visibility.Collapsed;
+            TxtPreview.Text = _cachedHexPreview ?? "// No hex data available";
+        }
+        else
+        {
+            ScrollTextHex.Visibility = Visibility.Visible;
+            ScrollImage.Visibility = Visibility.Collapsed;
+            TxtPreview.Text = _cachedTextPreview ?? "// No text preview available (Binary or Non-text format)";
         }
     }
 
     private void ClearSelection()
     {
         _selectedItem = null;
+        _cachedTextPreview = null;
+        _cachedHexPreview = null;
+        _cachedImagePreview = null;
+
         TxtDetailName.Text = "No item selected";
         TxtDetailPath.Text = string.Empty;
         TxtDetailSize.Text = string.Empty;
         TxtDetailPerms.Text = string.Empty;
         TxtDetailInode.Text = string.Empty;
         TxtPreview.Text = "// File preview will appear here...";
+
         BtnExport.IsEnabled = false;
         BtnQuickExport.IsEnabled = false;
+        BtnOpenWith.IsEnabled = false;
+        BtnCopyPath.IsEnabled = false;
+
+        RbViewText.IsChecked = true;
+        RbViewMode_Checked(this, new RoutedEventArgs());
+    }
+
+    private void BtnOpenWith_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedItem != null)
+        {
+            OpenWithDefaultApp(_selectedItem);
+        }
+    }
+
+    private void BtnCopyPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedItem != null)
+        {
+            Clipboard.SetText(_selectedItem.FullPath);
+            TxtStatus.Text = $"Copied path '{_selectedItem.FullPath}' to clipboard.";
+        }
+    }
+
+    private void CtxOpenDefault_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedItem != null)
+        {
+            OpenWithDefaultApp(_selectedItem);
+        }
+    }
+
+    private void CtxCopyPath_Click(object sender, RoutedEventArgs e)
+    {
+        BtnCopyPath_Click(sender, e);
+    }
+
+    private void CtxCopyContent_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedItem == null) return;
+
+        if (!string.IsNullOrEmpty(_cachedTextPreview))
+        {
+            Clipboard.SetText(_cachedTextPreview);
+            TxtStatus.Text = $"Copied text content of '{_selectedItem.Name}' to clipboard.";
+        }
+        else
+        {
+            MessageBox.Show("No text content available to copy for this item.", "Copy Notice", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    private void CtxProperties_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedItem == null) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"Name: {_selectedItem.Name}");
+        sb.AppendLine($"Full Linux Path: {_selectedItem.FullPath}");
+        sb.AppendLine($"Size: {_selectedItem.FormattedSize} ({_selectedItem.Size:N0} bytes)");
+        sb.AppendLine($"Type: {_selectedItem.FileTypeName}");
+        sb.AppendLine($"Permissions: {_selectedItem.Permissions} (Mode: 0x{_selectedItem.Inode.Mode:X4})");
+        sb.AppendLine($"Inode Number: {_selectedItem.InodeNumber}");
+        sb.AppendLine($"Links Count: {_selectedItem.Inode.LinksCount}");
+        sb.AppendLine($"Flags: 0x{_selectedItem.Inode.Flags:X8} (Extents: {_selectedItem.Inode.UsesExtents})");
+        sb.AppendLine($"Modified: {_selectedItem.ModifiedTime.LocalDateTime}");
+        if (_selectedItem.IsSymlink && !string.IsNullOrEmpty(_selectedItem.SymlinkTarget))
+        {
+            sb.AppendLine($"Symlink Points To: {_selectedItem.SymlinkTarget}");
+        }
+
+        MessageBox.Show(sb.ToString(), $"Inode Metadata - {_selectedItem.Name}", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void BtnExport_Click(object sender, RoutedEventArgs e)

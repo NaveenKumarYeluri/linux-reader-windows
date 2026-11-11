@@ -42,15 +42,24 @@ jobs:
             /p:IncludeNativeLibrariesForSelfExtract=true `
             --output ./artifacts/cli-win-x64
 
-      - name: Package Archives
+      - name: Package Archives & Windows Setup Installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path ./dist
           Compress-Archive -Path ./artifacts/gui-win-x64/LinuxReader.exe -DestinationPath ./dist/LinuxReader-GUI-win-x64.zip
           Compress-Archive -Path ./artifacts/cli-win-x64/linux-reader-cli.exe -DestinationPath ./dist/LinuxReader-CLI-win-x64.zip
           
+          # Compile Inno Setup Windows Installer
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (Test-Path $isccPath) {
+            Write-Host "Compiling Inno Setup Windows Installer..."
+            & $isccPath installer/setup.iss
+          } else {
+            Write-Warning "ISCC not found at $isccPath"
+          }
+
           # Generate SHA256 checksums
-          Get-FileHash -Algorithm SHA256 ./dist/*.zip | ForEach-Object {
+          Get-FileHash -Algorithm SHA256 ./dist/* | Where-Object { $_.Path -notlike "*.txt" } | ForEach-Object {
             "$($_.Hash)  $([System.IO.Path]::GetFileName($_.Path))"
           } | Out-File -FilePath ./dist/SHA256SUMS.txt -Encoding utf8
 
@@ -59,6 +68,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
+            ./dist/LinuxReader-Setup-x64.exe
             ./dist/LinuxReader-GUI-win-x64.zip
             ./dist/LinuxReader-CLI-win-x64.zip
             ./dist/SHA256SUMS.txt
