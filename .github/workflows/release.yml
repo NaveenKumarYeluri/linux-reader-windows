@@ -42,6 +42,9 @@ jobs:
             /p:IncludeNativeLibrariesForSelfExtract=true `
             --output ./artifacts/cli-win-x64
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+
       - name: Package Archives & Windows Setup Installer
         shell: pwsh
         run: |
@@ -50,13 +53,12 @@ jobs:
           Compress-Archive -Path ./artifacts/cli-win-x64/linux-reader-cli.exe -DestinationPath ./dist/LinuxReader-CLI-win-x64.zip
           
           # Compile Inno Setup Windows Installer
-          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (Test-Path $isccPath) {
-            Write-Host "Compiling Inno Setup Windows Installer..."
-            & $isccPath installer/setup.iss
-          } else {
-            Write-Warning "ISCC not found at $isccPath"
+          Write-Host "Compiling Inno Setup Windows Installer..."
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
+          if (-not $iscc) {
+            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           }
+          & $iscc installer/setup.iss
 
           # Generate SHA256 checksums
           Get-FileHash -Algorithm SHA256 ./dist/* | Where-Object { $_.Path -notlike "*.txt" } | ForEach-Object {
