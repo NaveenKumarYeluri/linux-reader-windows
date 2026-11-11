@@ -28,3 +28,32 @@ jobs:
 
       - name: Run Unit & Integration Tests
         run: dotnet test LinuxReader.sln --no-build --configuration Release --verbosity normal
+
+      - name: Publish GUI Application (Single-File Standalone win-x64)
+        run: |
+          dotnet publish src/LinuxReader.Gui/LinuxReader.Gui.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=true `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
+            --output ./artifacts/gui-win-x64
+
+      - name: Publish CLI Application (Single-File Standalone win-x64)
+        run: |
+          dotnet publish src/LinuxReader.Cli/LinuxReader.Cli.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=true `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
+            --output ./artifacts/cli-win-x64
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinuxReader-win-x64-ci-build
+          path: |
+            ./artifacts/gui-win-x64/LinuxReader.exe
+            ./artifacts/cli-win-x64/linux-reader-cli.exe
+          if-no-files-found: error
