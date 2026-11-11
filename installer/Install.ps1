@@ -77,7 +77,7 @@ if ($CreateDesktopShortcut) {
 $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\LinuxReader"
 New-Item -Path $uninstallKey -Force | Out-Null
 Set-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "Linux File Reader for Windows"
-Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.1.0"
+Set-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "1.2.0"
 Set-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "Naveen Kumar Yeluri & Antigravity"
 Set-ItemProperty -Path $uninstallKey -Name "DisplayIcon" -Value "$InstallDir\app.ico"
 Set-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir
