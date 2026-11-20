@@ -1,6 +1,6 @@
 ; Inno Setup Script for Linux File Reader for Windows
 #define MyAppName "Linux File Reader for Windows"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.1"
 #define MyAppPublisher "Naveen Kumar Yeluri & Antigravity"
 #define MyAppURL "https://github.com/NaveenKumarYeluri/linux-reader-windows"
 #define MyAppExeName "LinuxReader.exe"
